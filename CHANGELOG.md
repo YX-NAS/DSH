@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 - 2026-08-16
+
+- Accept login and logout submissions without an `Origin` header only when Fetch Metadata explicitly proves the request is same-origin.
+- Preserve rejection of cross-site and origin-unproven state-changing requests.
+
 ## 0.1.0 - 2026-08-16
 
 - Add an Nginx-integrated login page and server-tracked signed sessions.

@@ -186,6 +186,22 @@ describe('HTTP authentication service', () => {
     expect(failed.headers.location).toContain('/login?failed=1')
   })
 
+  it('accepts an Origin-less login only when Fetch Metadata proves it is same-origin', async () => {
+    const sameOrigin = await call('/login', {
+      method: 'POST',
+      headers: loginHeaders({ Origin: '', 'Sec-Fetch-Site': 'same-origin' }),
+      body: 'username=operator&password=wrong',
+    })
+    expect(sameOrigin.status).toBe(303)
+
+    const unproven = await call('/login', {
+      method: 'POST',
+      headers: loginHeaders({ Origin: '' }),
+      body: 'username=operator&password=wrong',
+    })
+    expect(unproven.status).toBe(403)
+  })
+
   it('rejects backslash and cross-origin return targets', async () => {
     const page = await call('/login?returnTo=%2F%5Cevil.example%2Fx')
     expect(page.body).toContain('name="returnTo" value="/"')

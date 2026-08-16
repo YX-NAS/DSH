@@ -60,8 +60,11 @@ function expectedAuthority(config: AuthConfig): string {
 
 function sameOriginRequest(req: IncomingMessage, config: AuthConfig): boolean {
   if (req.headers.host !== expectedAuthority(config)) return false
-  if (req.headers['sec-fetch-site'] === 'cross-site') return false
-  return req.headers.origin === config.publicOrigin
+  const fetchSite = req.headers['sec-fetch-site']
+  if (fetchSite === 'cross-site') return false
+  const origin = req.headers.origin
+  return origin === config.publicOrigin
+    || ((origin === undefined || origin === '') && fetchSite === 'same-origin')
 }
 
 function authSubrequestAllowed(req: IncomingMessage, config: AuthConfig): boolean {
