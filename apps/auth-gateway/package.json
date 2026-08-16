@@ -1,7 +1,7 @@
 {
   "name": "@yx-nas/dsh-auth-gateway",
   "description": "Session authentication service for a reverse-proxied DeepSeek Harness Web deployment",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "bin": {

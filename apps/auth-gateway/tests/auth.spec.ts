@@ -186,7 +186,7 @@ describe('HTTP authentication service', () => {
     expect(failed.headers.location).toContain('/login?failed=1')
   })
 
-  it('accepts an Origin-less login only when Fetch Metadata proves it is same-origin', async () => {
+  it('accepts an Origin-less login unless Fetch Metadata identifies it as cross-site', async () => {
     const sameOrigin = await call('/login', {
       method: 'POST',
       headers: loginHeaders({ Origin: '', 'Sec-Fetch-Site': 'same-origin' }),
@@ -199,7 +199,14 @@ describe('HTTP authentication service', () => {
       headers: loginHeaders({ Origin: '' }),
       body: 'username=operator&password=wrong',
     })
-    expect(unproven.status).toBe(403)
+    expect(unproven.status).toBe(303)
+
+    const crossSite = await call('/login', {
+      method: 'POST',
+      headers: loginHeaders({ Origin: '', 'Sec-Fetch-Site': 'cross-site' }),
+      body: 'username=operator&password=wrong',
+    })
+    expect(crossSite.status).toBe(403)
   })
 
   it('rejects backslash and cross-origin return targets', async () => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 - 2026-08-16
+
+- Support privacy-oriented browsers that omit both `Origin` and same-origin Fetch Metadata on top-level form submissions.
+- Continue rejecting mismatched origins, mismatched hosts, and requests explicitly marked cross-site.
+
 ## 0.1.1 - 2026-08-16
 
 - Accept login and logout submissions without an `Origin` header only when Fetch Metadata explicitly proves the request is same-origin.

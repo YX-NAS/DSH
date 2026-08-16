@@ -63,8 +63,7 @@ function sameOriginRequest(req: IncomingMessage, config: AuthConfig): boolean {
   const fetchSite = req.headers['sec-fetch-site']
   if (fetchSite === 'cross-site') return false
   const origin = req.headers.origin
-  return origin === config.publicOrigin
-    || ((origin === undefined || origin === '') && fetchSite === 'same-origin')
+  return origin === undefined || origin === '' || origin === config.publicOrigin
 }
 
 function authSubrequestAllowed(req: IncomingMessage, config: AuthConfig): boolean {
