@@ -6,6 +6,12 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 它采用**一切皆插件**的架构，并由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper)。
 
+## YX-NAS 安全增强版
+
+本仓库为公网反向代理的 Web 部署增加了可选的 [`DSH Auth Gateway`](apps/auth-gateway/README.md)。`0.1.0` 版本提供表单登录、服务端跟踪的签名会话、仅允许 POST 的退出登录、精确同源 CSRF 校验、登录限速和生产 Nginx/systemd 模板，同时保持 Harness 仅监听回环地址。
+
+上游 Harness 仍处于开发者预览阶段。该鉴权网关属于 YX-NAS 维护的部署基础设施，不是 DeepSeek AI 官方组件。
+
 ## 开发者预览
 
 DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**

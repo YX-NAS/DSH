@@ -1,0 +1,21 @@
+{
+  "name": "@yx-nas/dsh-auth-gateway",
+  "description": "Session authentication service for a reverse-proxied DeepSeek Harness Web deployment",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dsh-auth-gateway": "lib/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node lib/bin.js",
+    "test": "vitest run --root ../.. apps/auth-gateway/tests/auth.spec.ts"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

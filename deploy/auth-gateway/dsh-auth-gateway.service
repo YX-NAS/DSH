@@ -1,0 +1,23 @@
+[Unit]
+Description=DSH Session Authentication Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dsh-auth
+Group=dsh-auth
+WorkingDirectory=/opt/dsh-auth-gateway
+EnvironmentFile=/etc/dsh-auth-gateway.env
+ExecStart=/usr/bin/node /opt/dsh-auth-gateway/lib/bin.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectProc=invisible
+ProcSubset=pid
+
+[Install]
+WantedBy=multi-user.target
