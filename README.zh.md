@@ -8,7 +8,7 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 ## YX-NAS 安全增强版
 
-本仓库为公网反向代理的 Web 部署增加了可选的 [`DSH Auth Gateway`](apps/auth-gateway/README.md)。`0.1.2` 版本提供表单登录、服务端跟踪的签名会话、仅允许 POST 的退出登录、同源 CSRF 校验、登录限速和生产 Nginx/systemd 模板，同时保持 Harness 仅监听回环地址。
+本仓库为公网反向代理的 Web 部署增加了可选的 [`DSH Auth Gateway`](apps/auth-gateway/README.md)。`0.1.3` 版本提供表单登录、服务端跟踪的签名会话、仅允许 POST 的退出登录、同源 CSRF 校验、登录限速和生产 Nginx/systemd 模板，同时保持 Harness 仅监听回环地址。
 
 上游 Harness 仍处于开发者预览阶段。该鉴权网关属于 YX-NAS 维护的部署基础设施，不是 DeepSeek AI 官方组件。
 

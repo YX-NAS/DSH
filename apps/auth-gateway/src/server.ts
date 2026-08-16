@@ -66,6 +66,10 @@ function sameOriginRequest(req: IncomingMessage, config: AuthConfig): boolean {
   return origin === undefined || origin === '' || origin === config.publicOrigin
 }
 
+function logRejectedOrigin(req: IncomingMessage): void {
+  process.stderr.write(`dsh-auth-gateway: rejected origin host=${req.headers.host ?? '-'} origin=${req.headers.origin ?? '-'} sec-fetch-site=${req.headers['sec-fetch-site'] ?? '-'}\n`)
+}
+
 function authSubrequestAllowed(req: IncomingMessage, config: AuthConfig): boolean {
   if (req.headers['x-original-host'] !== expectedAuthority(config)) return false
   const method = req.headers['x-original-method']
@@ -142,7 +146,7 @@ export function createAuthServer(config: AuthConfig): Server {
     }
 
     if (req.method === 'POST' && url.pathname === '/login') {
-      if (!sameOriginRequest(req, config)) {
+      if (req.headers.host !== expectedAuthority(config)) {
         res.writeHead(403)
         res.end('forbidden')
         return
@@ -196,6 +200,7 @@ export function createAuthServer(config: AuthConfig): Server {
 
     if (req.method === 'POST' && url.pathname === '/logout') {
       if (!sameOriginRequest(req, config)) {
+        logRejectedOrigin(req)
         res.writeHead(403)
         res.end('forbidden')
         return

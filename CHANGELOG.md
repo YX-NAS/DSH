@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 - 2026-08-16
+
+- Make the credential-gated, rate-limited login endpoint compatible with opaque-origin embedded browsers.
+- Keep exact-origin enforcement on logout and all authenticated state-changing Harness API requests.
+
 ## 0.1.2 - 2026-08-16
 
 - Support privacy-oriented browsers that omit both `Origin` and same-origin Fetch Metadata on top-level form submissions.

@@ -169,13 +169,13 @@ describe('HTTP authentication service', () => {
     expect(logoutResponse.body).toContain('确认退出')
   })
 
-  it('rejects cross-site login and returns a generic error for bad credentials', async () => {
+  it('returns a generic error for bad credentials without trusting browser Origin metadata', async () => {
     const crossSite = await call('/login', {
       method: 'POST',
       headers: loginHeaders({ Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site' }),
       body: 'username=operator&password=wrong',
     })
-    expect(crossSite.status).toBe(403)
+    expect(crossSite.status).toBe(303)
 
     const failed = await call('/login', {
       method: 'POST',
@@ -203,10 +203,10 @@ describe('HTTP authentication service', () => {
 
     const crossSite = await call('/login', {
       method: 'POST',
-      headers: loginHeaders({ Origin: '', 'Sec-Fetch-Site': 'cross-site' }),
+      headers: loginHeaders({ Origin: '', 'Sec-Fetch-Site': 'cross-site', 'X-Real-IP': '203.0.113.90' }),
       body: 'username=operator&password=wrong',
     })
-    expect(crossSite.status).toBe(403)
+    expect(crossSite.status).toBe(303)
   })
 
   it('rejects backslash and cross-origin return targets', async () => {
