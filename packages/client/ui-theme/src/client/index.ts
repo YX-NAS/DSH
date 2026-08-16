@@ -10,6 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 // Type-only: the ctx.settingsScope Context merge. Cross-plugin collaboration
 // goes through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -20,9 +21,13 @@ import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
-  DEFAULT_PREFERENCE, isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  DEFAULT_PREFERENCE, isThemePreference, THEME_CUSTOM_TOKENS_FIELD, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
   type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
+import {
+  DEFAULT_CUSTOM_THEME, normalizeCustomThemeTokens, QQ2008_THEME, validateCustomThemeContrast,
+  type EditableThemeToken,
+} from '../custom-theme.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
 export type { AppearanceRowState } from './settings-store.ts'
@@ -84,6 +89,8 @@ export interface ThemeSnapshot {
   themes: readonly ThemeDefinition[]
   /** Monotonic change counter (registry or active changes). */
   revision: number
+  /** Validated editable palette used by the custom theme. */
+  customTokens: Readonly<Partial<Record<EditableThemeToken, string>>>
 }
 
 /** One theme token exposed to pre-definition Cordis inspection. */
@@ -118,6 +125,7 @@ declare module '@deepseek-ai/cordis' {
 const BUILTIN_THEMES: readonly ThemeDefinition[] = Object.freeze([
   Object.freeze({ id: 'light', colorScheme: 'light' as const, tokens: Object.freeze({}) }),
   Object.freeze({ id: 'dark', colorScheme: 'dark' as const, tokens: Object.freeze({}) }),
+  QQ2008_THEME,
 ])
 
 const BUILTIN_INSPECT_TOKENS: readonly ThemeTokenInspection[] = Object.freeze([
@@ -154,7 +162,9 @@ export class ThemeRuntime {
   private preference: ThemePreference
   private revision = 0
   private snapshot: ThemeSnapshot
+  private customTokens = normalizeCustomThemeTokens(DEFAULT_CUSTOM_THEME.tokens)
   private readonly media: MediaQueryList | undefined
+  private readonly browserStorage: Storage | undefined
   /** Override layers by source; seq (monotonic) is the stacking order. */
   private readonly overrides = new Map<string, { seq: number; tokens: ThemeTokenOverrides }>()
   private overrideSeq = 0
@@ -164,10 +174,12 @@ export class ThemeRuntime {
    * media-query and scope listeners are released through ctx.effect on dispose).
    * @param host - durable preference scope owned by the same plugin.
    */
-  constructor(ctx: Context, host: SettingsScope<ThemeSettings>) {
+  constructor(ctx: Context, host: SettingsScope<ThemeSettings>, browserStorage?: Storage) {
     this.ctx = ctx
     this.host = host
+    this.browserStorage = browserStorage
     this.preference = DEFAULT_PREFERENCE
+    if (browserStorage !== undefined) this.adoptBrowserStorage(browserStorage)
     // Non-browser runs (node e2e booting the client tree) have no matchMedia.
     this.media = typeof matchMedia === 'undefined' ? undefined : matchMedia('(prefers-color-scheme: dark)')
     this.snapshot = this.buildSnapshot()
@@ -220,21 +232,80 @@ export class ThemeRuntime {
    * @param id - a registered theme id or `system`; unknown ids throw.
    */
   setTheme(id: string): void {
-    if (id !== 'system' && !this.themes.some(t => t.id === id)) {
+    if (id !== 'system' && id !== 'custom' && !this.themes.some(t => t.id === id)) {
       throw new Error(`theme "${id}" is not registered`)
     }
     if (this.preference === id) return
     this.preference = id as ThemePreference
     if (isThemePreference(id)) void this.host.set(THEME_PREFERENCE_FIELD, id)
+    this.persistBrowserStorage()
     this.publish()
+  }
+
+  /**
+   * Validate, persist, and activate a complete custom color palette.
+   * @param tokens - complete allowlisted semantic color palette.
+   */
+  setCustomTokens(tokens: Readonly<Record<string, string>>): void {
+    const normalized = normalizeCustomThemeTokens(tokens)
+    validateCustomThemeContrast(normalized)
+    const serialized = JSON.stringify(normalized)
+    this.customTokens = normalized
+    void this.host.set(THEME_CUSTOM_TOKENS_FIELD, serialized)
+    if (this.preference !== 'custom') {
+      this.preference = 'custom'
+      void this.host.set(THEME_PREFERENCE_FIELD, 'custom')
+    }
+    this.persistBrowserStorage()
+    this.publish()
+  }
+
+  private adoptBrowserStorage(storage: Storage): void {
+    try {
+      const raw = storage.getItem(THEME_SETTINGS_NAMESPACE)
+      if (raw === null) return
+      const value = JSON.parse(raw) as { preference?: unknown; customTokens?: unknown }
+      if (isThemePreference(value.preference)) this.preference = value.preference
+      if (typeof value.customTokens === 'object' && value.customTokens !== null) {
+        const normalized = normalizeCustomThemeTokens(value.customTokens as Record<string, string>)
+        validateCustomThemeContrast(normalized)
+        this.customTokens = normalized
+      }
+    } catch { /* Corrupt browser data falls back to safe defaults. */ }
+  }
+
+  private persistBrowserStorage(): void {
+    try {
+      this.browserStorage?.setItem(THEME_SETTINGS_NAMESPACE, JSON.stringify({
+        preference: this.preference,
+        customTokens: this.customTokens,
+      }))
+    } catch { /* Storage may be disabled or full; live theming still works. */ }
+  }
+
+  /** Restore the shipped custom palette and activate it. */
+  resetCustomTokens(): void {
+    this.setCustomTokens(DEFAULT_CUSTOM_THEME.tokens)
   }
 
   /** Adopt the scope's accepted durable preference without writing it back. */
   private adopt(): void {
     const section = this.host.getSnapshot().value
-    if (section === undefined || this.preference === section.preference) return
+    if (section === undefined) return
+    let changed = this.preference !== section.preference
     this.preference = section.preference
-    this.publish()
+    try {
+      const parsed = JSON.parse(section.customTokens) as unknown
+      if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
+        const normalized = normalizeCustomThemeTokens(parsed as Record<string, string>)
+        validateCustomThemeContrast(normalized)
+        if (JSON.stringify(normalized) !== JSON.stringify(this.customTokens)) {
+          this.customTokens = normalized
+          changed = true
+        }
+      }
+    } catch { /* Invalid durable drafts keep the safe default palette. */ }
+    if (changed) this.publish()
   }
 
   /**
@@ -246,7 +317,7 @@ export class ThemeRuntime {
    * unregistered theme.
    */
   register(definition: ThemeDefinition): () => void {
-    if (definition.id === 'system') throw new Error('"system" is a preference, not a registrable theme id')
+    if (isThemePreference(definition.id)) throw new Error(`"${definition.id}" is a reserved product preference`)
     if (this.themes.some(t => t.id === definition.id)) {
       throw new Error(`theme "${definition.id}" is already registered`)
     }
@@ -295,14 +366,17 @@ export class ThemeRuntime {
       : this.preference
     // Both built-ins always exist; a registered preference id resolves or has
     // been reset by its disposer, so the lookup cannot miss.
-    const active = this.themes.find(t => t.id === resolvedId)
+    const custom: ThemeDefinition = Object.freeze({ id: 'custom', colorScheme: 'light', tokens: Object.freeze({ ...this.customTokens }) })
+    const themes = [...this.themes, custom]
+    const active = themes.find(t => t.id === resolvedId)
     /* v8 ignore next 2 -- needs a registry without light/dark, which register()/dispose() cannot produce */
     if (active === undefined) throw new Error(`theme registry lost "${resolvedId}"`)
     return Object.freeze({
       preference: this.preference,
       active: this.composeActive(active),
-      themes: Object.freeze([...this.themes]),
+      themes: Object.freeze(themes),
       revision: this.revision,
+      customTokens: Object.freeze({ ...this.customTokens }),
     })
   }
 
@@ -383,7 +457,9 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope
  */
 export function apply(ctx: ClientContext): void {
   const host = ctx.settingsScope.bind<ThemeSettings>({ namespace: THEME_SETTINGS_NAMESPACE })
-  const theme = new ThemeRuntime(ctx, host)
+  const connection = ctx.get('connection') as ConnectionHandle
+  const browserStorage = !connection.isLoopback && typeof localStorage !== 'undefined' ? localStorage : undefined
+  const theme = new ThemeRuntime(ctx, host, browserStorage)
   ctx.provide('theme', theme)
 
   ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
@@ -391,7 +467,7 @@ export function apply(ctx: ClientContext): void {
   const store = createAppearanceRowStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, snapshot.revision)
+    bound?.sync(snapshot.preference, JSON.stringify(snapshot.customTokens), snapshot.revision)
   }
   ctx.on('theme/change', sync)
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
@@ -401,6 +477,8 @@ export function apply(ctx: ClientContext): void {
     sync(theme.getTheme())
     return {
       setTheme: (id) => { theme.setTheme(id) },
+      saveCustomTokens: (tokens) => { theme.setCustomTokens(tokens) },
+      resetCustomTokens: () => { theme.resetCustomTokens() },
     }
   }
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({

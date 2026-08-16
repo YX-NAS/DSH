@@ -14,7 +14,7 @@ const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference: colorScheme, active, themes: [active], revision: 1 }
+  return { preference: colorScheme, active, themes: [active], revision: 1, customTokens: {} }
 }
 
 function clearThemePresentation(): void {
@@ -42,6 +42,15 @@ beforeEach(() => {
 afterEach(clearThemePresentation)
 
 describe('ThemePresenter', () => {
+  it('retracts bootstrap-owned QQ tokens before applying a different first snapshot', () => {
+    document.body.style.setProperty('--dsw-alias-bg-base', '#DCECF8')
+    document.body.setAttribute('data-dsh-boot-theme-tokens', '--dsw-alias-bg-base')
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('dark'))
+    expect(document.body.style.getPropertyValue('--dsw-alias-bg-base')).toBe('')
+    expect(document.body.hasAttribute('data-dsh-boot-theme-tokens')).toBe(false)
+  })
+
   it('light scheme sets root color-scheme and leaves the dark attribute absent', () => {
     const presenter = new ThemePresenter()
     presenter.apply(snapshot('light'))

@@ -1,0 +1,31 @@
+/* QQ 2008-inspired chrome. No trademarks or original artwork are used. */
+body[data-dsh-theme='qq2008'] {
+  --dsh-qq-highlight: rgb(255 255 255 / 72%);
+}
+
+body[data-dsh-theme='qq2008'] button,
+body[data-dsh-theme='qq2008'] input,
+body[data-dsh-theme='qq2008'] select,
+body[data-dsh-theme='qq2008'] textarea {
+  border-radius: 5px;
+}
+
+body[data-dsh-theme='qq2008'] button:not([aria-pressed='true']) {
+  box-shadow: inset 0 1px 0 var(--dsh-qq-highlight);
+}
+
+body[data-dsh-theme='qq2008'] [role='dialog'] {
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 7px;
+  box-shadow: inset 0 1px 0 var(--dsh-qq-highlight), 0 8px 24px rgb(0 70 115 / 25%);
+}
+
+body[data-dsh-theme='qq2008'] [role='dialog'] > :first-child {
+  background: linear-gradient(#eaf7ff, #b9ddf3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-dsh-theme='qq2008'] * {
+    scroll-behavior: auto;
+  }
+}

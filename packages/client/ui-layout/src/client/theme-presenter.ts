@@ -11,6 +11,8 @@ import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 
 /** Body attribute selecting the dark base palette in the token stylesheets. */
 export const DARK_ATTRIBUTE = 'data-ds-dark-theme'
+/** Body attribute exposing the active concrete theme for scoped visuals. */
+export const THEME_ATTRIBUTE = 'data-dsh-theme'
 
 /** Applies theme snapshots to the document; one instance per plugin fiber. */
 export class ThemePresenter {
@@ -38,8 +40,14 @@ export class ThemePresenter {
     const scheme = snapshot.active.colorScheme
     document.documentElement.style.colorScheme = scheme
     const body = document.body
+    const bootTokens = body.getAttribute('data-dsh-boot-theme-tokens')
+    if (bootTokens !== null) {
+      for (const name of bootTokens.split(',')) body.style.removeProperty(name)
+      body.removeAttribute('data-dsh-boot-theme-tokens')
+    }
     if (scheme === 'dark') body.setAttribute(DARK_ATTRIBUTE, '')
     else body.removeAttribute(DARK_ATTRIBUTE)
+    body.setAttribute(THEME_ATTRIBUTE, snapshot.active.id)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
     for (const [name, value] of Object.entries(snapshot.active.tokens)) {
@@ -55,6 +63,7 @@ export class ThemePresenter {
     document.documentElement.style.removeProperty('color-scheme')
     const body = document.body
     body.removeAttribute(DARK_ATTRIBUTE)
+    body.removeAttribute(THEME_ATTRIBUTE)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
     this.themeColorMeta.remove()

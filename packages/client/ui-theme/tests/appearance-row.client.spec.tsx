@@ -9,6 +9,8 @@ import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import type { AppearanceRowComponentProps } from '../src/client/AppearanceRow.tsx'
 import { createAppearanceRowStore } from '../src/client/settings-store.ts'
 import type { ThemePreference } from '../src/client/index.ts'
+import { DEFAULT_CUSTOM_THEME } from '../src/custom-theme.ts'
+import { en } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -36,15 +38,17 @@ function emptyWorkspaces() {
 function mount(preference: ThemePreference = 'system') {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createAppearanceRowStore().create()
-  store.actions.sync(preference, 0)
+  store.actions.sync(preference, JSON.stringify(DEFAULT_CUSTOM_THEME.tokens), 0)
   const setTheme = vi.fn()
   const props: AppearanceRowComponentProps = {
     useSessions: emptySessions(),
     useWorkspaces: emptyWorkspaces(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
-    t: (key: string) => COPY[key] ?? key,
+    t: (key: string) => (en as Record<string, string>)[key] ?? COPY[key] ?? key,
     setTheme,
+    saveCustomTokens: vi.fn(),
+    resetCustomTokens: vi.fn(),
   }
   render(<AppearanceRow {...props} />)
   return { store, setTheme }
@@ -54,12 +58,14 @@ const pressed = (name: RegExp): string | null =>
   screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('AppearanceRow', () => {
-  it('renders the title and three cubes with the preference cube selected', () => {
+  it('renders the title and five cubes with the preference cube selected', () => {
     mount('dark')
     expect(screen.getByText('Appearance')).toBeDefined()
     expect(pressed(/Dark/)).toBe('true')
     expect(pressed(/Light/)).toBe('false')
     expect(pressed(/System/)).toBe('false')
+    expect(pressed(/QQ 2008/)).toBe('false')
+    expect(pressed(/My theme/)).toBe('false')
   })
 
   it('click drives setTheme; selection follows the store mirror, not the click echo', () => {
@@ -68,8 +74,16 @@ describe('AppearanceRow', () => {
     expect(b.setTheme).toHaveBeenCalledWith('light')
     // No store write yet: selection is unchanged.
     expect(pressed(/Dark/)).toBe('true')
-    act(() => { b.store.actions.sync('light', 1) })
+    act(() => { b.store.actions.sync('light', '{}', 1) })
     expect(pressed(/Light/)).toBe('true')
     expect(pressed(/Dark/)).toBe('false')
+  })
+
+  it('renders a constrained color editor for the custom theme', () => {
+    mount('custom')
+    expect(screen.getByLabelText('Theme style editor')).toBeDefined()
+    expect(screen.getAllByDisplayValue(/^#[0-9a-f]{6}$/i)).toHaveLength(12)
+    expect(screen.getByRole('button', { name: 'Save and apply' })).toBeDefined()
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })

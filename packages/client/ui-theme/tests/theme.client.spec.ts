@@ -8,6 +8,7 @@ import type {
   ThemeTokenOverrides,
 } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { DEFAULT_CUSTOM_THEME, QQ2008_THEME } from '../src/custom-theme.ts'
 
 const make = (host = stubSettingsScope<ThemeSettings>()): {
   ctx: Context
@@ -29,7 +30,7 @@ describe('ThemeRuntime', () => {
     // jsdom matchMedia is absent; system resolves to light.
     expect(snapshot.active.id).toBe('light')
     expect(snapshot.active.colorScheme).toBe('light')
-    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark'])
+    expect(snapshot.themes.map(t => t.id)).toEqual(['light', 'dark', 'qq2008', 'custom'])
   })
 
   it('setTheme switches, writes through the scope, republishes, and keeps DOM untouched', () => {
@@ -48,19 +49,31 @@ describe('ThemeRuntime', () => {
     expect(host.set).toHaveBeenCalledOnce()
   })
 
+  it('ships QQ2008 and saves only complete validated custom palettes', () => {
+    const { theme, host } = make()
+    theme.setTheme('qq2008')
+    expect(theme.getTheme().active.tokens).toEqual(QQ2008_THEME.tokens)
+    theme.setCustomTokens({ ...DEFAULT_CUSTOM_THEME.tokens, '--dsw-alias-brand-primary': '#123456' })
+    expect(theme.getTheme().preference).toBe('custom')
+    expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#123456')
+    expect(host.set).toHaveBeenCalledWith('customTokens', expect.stringContaining('#123456'))
+    expect(() => { theme.setCustomTokens({ '--unknown': 'url(https://evil.test)' }) }).toThrow()
+    expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#123456')
+  })
+
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', customTokens: '{}' }, revision: 1, writable: true })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark' }, revision: 2 })
+    host.publish({ value: { preference: 'dark', customTokens: '{}' }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubSettingsScope<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', customTokens: '{}' }, revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
   })
@@ -68,19 +81,20 @@ describe('ThemeRuntime', () => {
   it('throws on unknown setTheme ids, duplicate registration, and the system id', () => {
     const { theme } = make()
     expect(() => { theme.setTheme('sepia') }).toThrow('not registered')
-    expect(() => theme.register({ id: 'light', colorScheme: 'light', tokens: {} })).toThrow('already registered')
+    expect(() => theme.register({ id: 'light', colorScheme: 'light', tokens: {} })).toThrow('reserved')
     expect(() => theme.register({ id: 'system', colorScheme: 'light', tokens: {} })).toThrow('preference')
+    expect(() => theme.register({ id: 'custom', colorScheme: 'light', tokens: {} })).toThrow('reserved')
   })
 
   it('registered themes join the snapshot; disposing the active one resets to default', () => {
     const { theme, events, host } = make()
     const dispose = theme.register({ id: 'sepia', colorScheme: 'light', tokens: { '--dsw-alias-bg-base': 'red' } })
-    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark', 'sepia'])
+    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark', 'qq2008', 'sepia', 'custom'])
     theme.setTheme('sepia')
     expect(theme.getTheme().active.tokens['--dsw-alias-bg-base']).toBe('red')
     dispose()
     expect(theme.getTheme().preference).toBe('system')
-    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark'])
+    expect(theme.getTheme().themes.map(t => t.id)).toEqual(['light', 'dark', 'qq2008', 'custom'])
     // Custom ids are in-process extension themes; only the built-in product
     // preferences cross the Host settings schema.
     expect(host.set).not.toHaveBeenCalled()
@@ -154,7 +168,7 @@ describe('ThemeRuntime', () => {
   it('exports sorted built-in, registered, and override-only token descriptions as copies', () => {
     const { theme } = make()
     theme.register({
-      id: 'custom',
+      id: 'custom-package',
       colorScheme: 'light',
       tokens: {
         '--dsw-alias-bg-base': 'duplicate-built-in',

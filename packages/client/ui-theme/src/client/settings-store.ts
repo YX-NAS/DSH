@@ -12,11 +12,13 @@ export interface AppearanceRowState {
   preference: ThemePreference
   /** Service revision; -1 until first sync so revision 0 lands as a change. */
   revision: number
+  /** Canonical custom-theme JSON shown by the constrained editor. */
+  customTokens: string
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
 type AppearanceRowActions = {
-  sync: (draft: AppearanceRowState, preference: ThemePreference, revision: number) => void
+  sync: (draft: AppearanceRowState, preference: ThemePreference, customTokens: string, revision: number) => void
 }
 
 /**
@@ -25,11 +27,12 @@ type AppearanceRowActions = {
  */
 export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState, AppearanceRowActions> {
   return defineStore({
-    init: (): AppearanceRowState => ({ preference: 'system', revision: -1 }),
+    init: (): AppearanceRowState => ({ preference: 'system', customTokens: '{}', revision: -1 }),
     actions: {
-      sync: (d, preference: ThemePreference, revision: number) => {
+      sync: (d, preference: ThemePreference, customTokens: string, revision: number) => {
         if (revision <= d.revision) return
         d.preference = preference
+        d.customTokens = customTokens
         d.revision = revision
       },
     },

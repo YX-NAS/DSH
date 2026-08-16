@@ -8,7 +8,7 @@ It uses an architecture where **everything is a plugin**, and is powered by [Cor
 
 ## YX-NAS secured distribution
 
-This repository adds the optional [`DSH Auth Gateway`](apps/auth-gateway/README.md) for public, reverse-proxied Web deployments. Version `0.1.3` provides a form login, server-tracked signed sessions, POST-only logout, same-origin CSRF checks, login rate limiting, and production Nginx/systemd templates while keeping Harness bound to loopback.
+This repository adds the optional [`DSH Auth Gateway`](apps/auth-gateway/README.md) for public, reverse-proxied Web deployments. Version `0.2.0` adds light, dark, system, QQ 2008-inspired, and custom themes on top of secure login, logout, and sessions. The custom editor accepts only 12 allowlisted semantic colors in `#RRGGBB` form and never executes arbitrary CSS.
 
 The upstream Harness remains a developer preview. The authentication gateway is deployment infrastructure maintained by YX-NAS and is not an official DeepSeek AI component.
 

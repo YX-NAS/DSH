@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 - 2026-08-16
+
+- Add selectable QQ 2008-inspired and custom themes alongside light, dark, and system.
+- Add a constrained 12-color theme editor with strict semantic-token and `#RRGGBB` validation.
+- Persist remote-browser theme choices in same-origin browser storage without widening privileged Host settings access.
+- Expose the active concrete theme on `body[data-dsh-theme]` and bootstrap the QQ palette before client activation.
+
 ## 0.1.3 - 2026-08-16
 
 - Make the credential-gated, rate-limited login endpoint compatible with opaque-origin embedded browsers.

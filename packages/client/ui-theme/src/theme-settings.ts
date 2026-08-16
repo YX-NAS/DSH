@@ -3,13 +3,16 @@
 import z from '@deepseek-ai/schemastery'
 
 /** Built-in preferences accepted at the registry and settings boundaries. */
-export const THEME_PREFERENCES = ['light', 'dark', 'system'] as const
+export const THEME_PREFERENCES = ['light', 'dark', 'system', 'qq2008', 'custom'] as const
 
 /** Settings namespace owned by the theme plugin. */
 export const THEME_SETTINGS_NAMESPACE = 'ui-theme'
 
 /** Field carrying the selected built-in theme preference. */
 export const THEME_PREFERENCE_FIELD = 'preference'
+
+/** Field carrying the validated custom-theme color document. */
+export const THEME_CUSTOM_TOKENS_FIELD = 'customTokens'
 
 /** Theme preference persisted by the product Appearance row. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
@@ -21,11 +24,14 @@ export const DEFAULT_PREFERENCE: ThemePreference = 'system'
 export interface ThemeSettings {
   /** Selected built-in preference. */
   preference: ThemePreference
+  /** JSON object produced by the constrained theme editor. */
+  customTokens: string
 }
 
 /** Durable theme schema; also the wire envelope the browser scope validates against. */
 export const ThemeSettingsSchema: z<ThemeSettings> = z.object({
   [THEME_PREFERENCE_FIELD]: z.union([...THEME_PREFERENCES]).default(DEFAULT_PREFERENCE),
+  [THEME_CUSTOM_TOKENS_FIELD]: z.string().default('{}'),
 })
 
 /**
