@@ -14,11 +14,22 @@ export interface AppearanceRowState {
   revision: number
   /** Canonical custom-theme JSON shown by the constrained editor. */
   customTokens: string
+  /** Validated custom background data URL. */
+  backgroundImage: string
+  /** Background opacity percentage. */
+  backgroundOpacity: number
 }
 
 /** Declared action shape giving the exported factory a stable return type. */
 type AppearanceRowActions = {
-  sync: (draft: AppearanceRowState, preference: ThemePreference, customTokens: string, revision: number) => void
+  sync: (
+    draft: AppearanceRowState,
+    preference: ThemePreference,
+    customTokens: string,
+    backgroundImage: string,
+    backgroundOpacity: number,
+    revision: number,
+  ) => void
 }
 
 /**
@@ -27,12 +38,16 @@ type AppearanceRowActions = {
  */
 export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState, AppearanceRowActions> {
   return defineStore({
-    init: (): AppearanceRowState => ({ preference: 'system', customTokens: '{}', revision: -1 }),
+    init: (): AppearanceRowState => ({
+      preference: 'system', customTokens: '{}', backgroundImage: '', backgroundOpacity: 25, revision: -1,
+    }),
     actions: {
-      sync: (d, preference: ThemePreference, customTokens: string, revision: number) => {
+      sync: (d, preference, customTokens, backgroundImage, backgroundOpacity, revision) => {
         if (revision <= d.revision) return
         d.preference = preference
         d.customTokens = customTokens
+        d.backgroundImage = backgroundImage
+        d.backgroundOpacity = backgroundOpacity
         d.revision = revision
       },
     },

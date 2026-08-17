@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-产品主题包括浅色、深色、跟随系统、QQ 2008 经典蓝与“我的主题”。主题编辑器只允许修改 12 个白名单语义颜色 token，值必须为完整 `#RRGGBB`，不会解析或执行任意 CSS。回环访问继续写入 Host 设置；远程访问仅写入当前域名的浏览器存储，避免扩大特权 settings API 的信任边界。
+产品主题包括浅色、深色、跟随系统、QQ 2008 经典蓝与“我的主题”。主题编辑器只允许修改 12 个白名单语义颜色 token，值必须为完整 `#RRGGBB`，不会解析或执行任意 CSS。“我的主题”还可使用不超过 512 KiB 的本地 PNG、JPEG 或 WebP 背景图，并调整图片透明度。任意 URL 与 SVG 会被拒绝；图片位于独立且不接收指针事件的背景层，不会改变正文透明度或交互。回环访问继续写入 Host 设置；远程访问仅写入当前域名的浏览器存储，避免扩大特权 settings API 的信任边界。
 
 主题插件：基于 --dsw-* token 基础样式表（静态尺度 + 别名语义层）的 ThemeRuntime。该服务拥有实时主题偏好（`light`／`dark`／`system`／`qq2008`／`custom`），将 `system` 通过 `prefers-color-scheme` 解析为实际主题，并通过 `theme/change` 发布不可变快照；DOM 仍由 ui-layout 呈现器统一更新。回环浏览器通过 Host settings API 读写 `ui-theme`，默认存入 `$DSH_HOME/settings.yaml`。远程浏览器不能访问特权 settings API，因此经过校验的产品主题偏好和自定义色板保存在同源浏览器存储中。第三方注册主题仍是进程内扩展，不会进入产品 settings schema。该特权持久化边界由[Host settings 支撑的偏好决策](../../../.agents/notes/implemented/bug-fix/2026-08-06-host-backed-web-preferences.md)拥有。
 
-当主机组合包含 HTTP 服务器时，主机侧紧接 `<body>` 起始标签注入同步引导代码。每份 index 响应会嵌入已注册的 Host 设置 `ui-theme.preference`，没有 settings provider 时则嵌入 `system`；浏览器按操作系统配色解析 `system`，随后在外壳加载页面渲染前设置 `color-scheme` 和 `body[data-ds-dark-theme]`。不含 HTTP 服务器的组合不受影响，插件树激活后，ThemeRuntime 与 ui-layout 仍分别是客户端状态和后续 DOM 更新的权威来源。
+当主机组合包含 HTTP 服务器时，主机侧紧接 `<body>` 起始标签注入同步引导代码。每份 index 响应会嵌入已注册的 Host 设置 `ui-theme.preference`，没有 settings provider 时则嵌入 `system`；浏览器按操作系统配色解析 `system`，随后在外壳加载页面渲染前设置 `color-scheme` 和 `body[data-ds-dark-theme]`。图片内容不会进入可执行的首屏引导 HTML，而是在客户端完成校验并激活主题后显示。不含 HTTP 服务器的组合不受影响，插件树激活后，ThemeRuntime 与 ui-layout 仍分别是客户端状态和后续 DOM 更新的权威来源。
 
 `src/styles/` 下有五张样式表，全部由 web 壳的 `base.css` 导入：`base.css`、`design-platform.css`、`scrollbar.css`、`gradient-shadow-text.css` 与 `shiki.css`。`scrollbar.css` 是 `--dsw-alias-scrollbar-*` token 的唯一消费方，必须排在声明这些 token 的 `design-platform.css` 之后。
 

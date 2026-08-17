@@ -1,0 +1,26 @@
+/* The image layer is isolated from application content so its opacity never
+ * reduces text or control contrast. Only the validated custom theme supplies
+ * these two variables. */
+body[data-dsh-theme='custom']::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--dsh-theme-background-image, none);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: var(--dsh-theme-background-opacity, 0);
+}
+
+body[data-dsh-theme='custom'] > #root {
+  position: relative;
+  z-index: 1;
+}
+
+@media (forced-colors: active) {
+  body[data-dsh-theme='custom']::before {
+    display: none;
+  }
+}

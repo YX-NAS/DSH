@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 - 2026-08-17
+
+- Add local PNG, JPEG, and WebP background images to My theme with adjustable opacity.
+- Render the image in a separate pointer-free layer so content opacity and interaction stay unchanged.
+- Reject remote URLs, SVG, mismatched signatures, oversized files, and invalid opacity values.
+
 ## 0.2.0 - 2026-08-16
 
 - Add selectable QQ 2008-inspired and custom themes alongside light, dark, and system.

@@ -16,14 +16,14 @@ import type { ThemeKey } from './locales.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { createAppearanceRowStore } from './settings-store.ts'
 import css from './AppearanceRow.module.css'
-import { EDITABLE_THEME_TOKENS, type EditableThemeToken } from '../custom-theme.ts'
+import { EDITABLE_THEME_TOKENS, MAX_BACKGROUND_IMAGE_BYTES, type EditableThemeToken } from '../custom-theme.ts'
 
 /** Injected business face: the preference write (t rides the standard locale seat). */
 export interface AppearanceRowInjected {
   /** Switch the theme preference. */
   setTheme: (id: ThemePreference) => void
   /** Save a complete, allowlisted custom palette. */
-  saveCustomTokens: (tokens: Readonly<Record<string, string>>) => void
+  saveCustomTheme: (tokens: Readonly<Record<string, string>>, image: string, opacity: number) => void
   /** Restore the shipped custom palette. */
   resetCustomTokens: () => void
 }
@@ -62,13 +62,49 @@ const TOKEN_KEYS: Record<EditableThemeToken, ThemeKey> = {
  * @param props - composed slot props.
  * @returns the row element tree.
  */
-export function AppearanceRow({ t, setTheme, saveCustomTokens, resetCustomTokens, useStore }: AppearanceRowComponentProps) {
+export function AppearanceRow({
+  t, setTheme, saveCustomTheme, resetCustomTokens, useStore,
+}: AppearanceRowComponentProps) {
   const preference = useStore(s => s.preference)
   const customTokens = useStore(s => s.customTokens)
+  const backgroundImage = useStore(s => s.backgroundImage)
+  const backgroundOpacity = useStore(s => s.backgroundOpacity)
   const [draft, setDraft] = useState<Record<string, string>>(() => JSON.parse(customTokens) as Record<string, string>)
   const [message, setMessage] = useState('')
   const [hasError, setHasError] = useState(false)
+  const [backgroundDraft, setBackgroundDraft] = useState(backgroundImage)
+  const [opacityDraft, setOpacityDraft] = useState(backgroundOpacity)
   useEffect(() => { setDraft(JSON.parse(customTokens) as Record<string, string>) }, [customTokens])
+  useEffect(() => { setBackgroundDraft(backgroundImage); setOpacityDraft(backgroundOpacity) }, [backgroundImage, backgroundOpacity])
+  const chooseBackground = async (file: File | undefined): Promise<void> => {
+    if (file === undefined) return
+    try {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > MAX_BACKGROUND_IMAGE_BYTES) {
+        throw new Error('unsupported background')
+      }
+      if (typeof createImageBitmap === 'function') {
+        const bitmap = await createImageBitmap(file)
+        const validDimensions = bitmap.width <= 4096 && bitmap.height <= 4096 && bitmap.width * bitmap.height <= 8_000_000
+        bitmap.close()
+        if (!validDimensions) throw new Error('background dimensions exceed limit')
+      }
+      const reader = new FileReader()
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.addEventListener('load', () => {
+          if (typeof reader.result === 'string') resolve(reader.result)
+          else reject(new Error('read failed'))
+        })
+        reader.addEventListener('error', () => { reject(reader.error ?? new Error('read failed')) })
+        reader.readAsDataURL(file)
+      })
+      setBackgroundDraft(dataUrl)
+      setMessage('')
+      setHasError(false)
+    } catch {
+      setMessage(t('editor.backgroundError'))
+      setHasError(true)
+    }
+  }
   return (
     <div className={css.group}>
       <div className={css.title}>{t('appearance.title')}</div>
@@ -103,9 +139,40 @@ export function AppearanceRow({ t, setTheme, saveCustomTokens, resetCustomTokens
               </label>
             ))}
           </div>
+          <div className={css.backgroundEditor}>
+            <div className={css.backgroundTitle}>{t('editor.background')}</div>
+            {backgroundDraft !== '' && <img className={css.backgroundPreview} src={backgroundDraft} alt="" />}
+            <label className={css.fileButton}>
+              {t('editor.chooseBackground')}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => { void chooseBackground(event.target.files?.[0]); event.target.value = '' }}
+              />
+            </label>
+            <label className={css.opacityField}>
+              <span>{t('editor.opacity')}: {opacityDraft}%</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={opacityDraft}
+                onChange={(event) => { setOpacityDraft(Number(event.target.value)); setMessage(''); setHasError(false) }}
+              />
+            </label>
+            <button type="button" disabled={backgroundDraft === ''} onClick={() => { setBackgroundDraft(''); setMessage('') }}>
+              {t('editor.removeBackground')}
+            </button>
+            <p className={css.backgroundHint}>{t('editor.backgroundHint')}</p>
+          </div>
           <div className={css.editorActions}>
             <button type="button" onClick={() => {
-              try { saveCustomTokens(draft); setMessage(t('editor.saved')); setHasError(false) }
+              try {
+                saveCustomTheme(draft, backgroundDraft, opacityDraft)
+                setMessage(t('editor.saved'))
+                setHasError(false)
+              }
               catch { setMessage(t('editor.contrastError')); setHasError(true) }
             }}>{t('editor.save')}</button>
             <button type="button" onClick={() => { resetCustomTokens(); setMessage(t('editor.resetDone')); setHasError(false) }}>{t('editor.reset')}</button>

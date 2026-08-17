@@ -8,7 +8,7 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 ## YX-NAS 安全增强版
 
-本仓库为公网反向代理的 Web 部署增加了可选的 [`DSH Auth Gateway`](apps/auth-gateway/README.md)。`0.2.0` 版本在安全登录、退出与会话能力之上，新增浅色、深色、跟随系统、QQ 2008 经典蓝和自定义主题。自定义编辑器只接受 12 个白名单语义颜色和 `#RRGGBB` 值，不执行任意 CSS。
+本仓库为公网反向代理的 Web 部署增加了可选的 [`DSH Auth Gateway`](apps/auth-gateway/README.md)。`0.2.1` 版本在安全登录、退出与会话能力之上，新增浅色、深色、跟随系统、QQ 2008 经典蓝和自定义主题。自定义编辑器只接受 12 个白名单语义颜色、`#RRGGBB` 值，以及不超过 512 KiB 的本地 PNG/JPEG/WebP 背景图；不执行任意 CSS，也不请求用户填写的图片 URL。
 
 上游 Harness 仍处于开发者预览阶段。该鉴权网关属于 YX-NAS 维护的部署基础设施，不是 DeepSeek AI 官方组件。
 

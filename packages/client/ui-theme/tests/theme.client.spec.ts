@@ -56,24 +56,67 @@ describe('ThemeRuntime', () => {
     theme.setCustomTokens({ ...DEFAULT_CUSTOM_THEME.tokens, '--dsw-alias-brand-primary': '#123456' })
     expect(theme.getTheme().preference).toBe('custom')
     expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#123456')
-    expect(host.set).toHaveBeenCalledWith('customTokens', expect.stringContaining('#123456'))
+    expect(host.set).toHaveBeenCalledWith('customTheme', expect.stringContaining('#123456'))
     expect(() => { theme.setCustomTokens({ '--unknown': 'url(https://evil.test)' }) }).toThrow()
     expect(theme.getTheme().active.tokens['--dsw-alias-brand-primary']).toBe('#123456')
   })
 
+  it('saves the custom palette and background atomically and removes it outside custom', () => {
+    const { theme, host, events } = make()
+    const image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB'
+    theme.setCustomTheme(DEFAULT_CUSTOM_THEME.tokens, image, 35)
+    expect(theme.getTheme()).toMatchObject({ preference: 'custom', backgroundImage: image, backgroundOpacity: 35 })
+    expect(theme.getTheme().active.tokens).toMatchObject({
+      '--dsh-theme-background-image': `url("${image}")`,
+      '--dsh-theme-background-opacity': '0.35',
+    })
+    expect(host.set).toHaveBeenCalledWith('customTheme', expect.stringContaining(image))
+    const revision = theme.getTheme().revision
+    expect(() => { theme.setCustomTheme(DEFAULT_CUSTOM_THEME.tokens, 'https://evil.test/x', 35) }).toThrow()
+    expect(theme.getTheme().revision).toBe(revision)
+    expect(events).toHaveLength(1)
+    theme.setTheme('dark')
+    expect(theme.getTheme().active.tokens['--dsh-theme-background-image']).toBeUndefined()
+  })
+
+  it('persists reset through the authoritative custom-theme envelope', () => {
+    const { theme, host } = make()
+    const changed = { ...DEFAULT_CUSTOM_THEME.tokens, '--dsw-alias-brand-primary': '#123456' }
+    theme.setCustomTheme(changed, 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB', 40)
+    theme.resetCustomTokens()
+    const resetCall = host.set.mock.calls.filter(call => call[0] === 'customTheme').at(-1)
+    expect(resetCall?.[1]).toBe(JSON.stringify({
+      tokens: DEFAULT_CUSTOM_THEME.tokens, backgroundImage: '', backgroundOpacity: 25,
+    }))
+    host.publish({
+      status: 'ready',
+      value: {
+        preference: 'custom', customTokens: '{}', customTheme: String(resetCall?.[1]), backgroundImage: '', backgroundOpacity: 25,
+      },
+      revision: 3,
+      writable: true,
+    })
+    expect(theme.getTheme().customTokens).toEqual(DEFAULT_CUSTOM_THEME.tokens)
+    expect(theme.getTheme().backgroundImage).toBe('')
+  })
+
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark', customTokens: '{}' }, revision: 1, writable: true })
+    host.publish({
+      status: 'ready', value: { preference: 'dark', customTokens: '{}', customTheme: '', backgroundImage: '', backgroundOpacity: 25 }, revision: 1, writable: true,
+    })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark', customTokens: '{}' }, revision: 2 })
+    host.publish({ value: { preference: 'dark', customTokens: '{}', customTheme: '', backgroundImage: '', backgroundOpacity: 25 }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubSettingsScope<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark', customTokens: '{}' }, revision: 1, writable: true })
+    host.publish({
+      status: 'ready', value: { preference: 'dark', customTokens: '{}', customTheme: '', backgroundImage: '', backgroundOpacity: 25 }, revision: 1, writable: true,
+    })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
   })

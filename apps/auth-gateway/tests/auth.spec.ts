@@ -277,6 +277,7 @@ describe('HTTP authentication service', () => {
     })
     expect(logout.status).toBe(303)
     expect(logout.headers['set-cookie']?.[0]).toContain('Max-Age=0')
+    expect(logout.headers['clear-site-data']).toBe('"storage"')
     expect((await call('/auth/check', { headers: { ...authHeaders, Cookie: cookie } })).status).toBe(401)
   })
 

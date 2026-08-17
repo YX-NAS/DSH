@@ -206,7 +206,11 @@ export function createAuthServer(config: AuthConfig): Server {
         return
       }
       sessions.revoke(cookieValue(req))
-      res.writeHead(303, { Location: '/login', 'Set-Cookie': clearCookie(config) })
+      res.writeHead(303, {
+        Location: '/login',
+        'Set-Cookie': clearCookie(config),
+        'Clear-Site-Data': '"storage"',
+      })
       res.end()
       return
     }

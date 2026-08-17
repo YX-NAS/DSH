@@ -21,11 +21,13 @@ import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
-  DEFAULT_PREFERENCE, isThemePreference, THEME_CUSTOM_TOKENS_FIELD, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  DEFAULT_PREFERENCE, isThemePreference, THEME_CUSTOM_THEME_FIELD,
+  THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
   type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 import {
-  DEFAULT_CUSTOM_THEME, normalizeCustomThemeTokens, QQ2008_THEME, validateCustomThemeContrast,
+  DEFAULT_CUSTOM_THEME, normalizeBackgroundImage, normalizeBackgroundOpacity, normalizeCustomThemeTokens,
+  QQ2008_THEME, validateCustomThemeContrast,
   type EditableThemeToken,
 } from '../custom-theme.ts'
 
@@ -91,6 +93,10 @@ export interface ThemeSnapshot {
   revision: number
   /** Validated editable palette used by the custom theme. */
   customTokens: Readonly<Partial<Record<EditableThemeToken, string>>>
+  /** Validated embedded image shown behind the custom theme. */
+  backgroundImage: string
+  /** Background image opacity as an integer percentage. */
+  backgroundOpacity: number
 }
 
 /** One theme token exposed to pre-definition Cordis inspection. */
@@ -163,6 +169,8 @@ export class ThemeRuntime {
   private revision = 0
   private snapshot: ThemeSnapshot
   private customTokens = normalizeCustomThemeTokens(DEFAULT_CUSTOM_THEME.tokens)
+  private backgroundImage = ''
+  private backgroundOpacity = 25
   private readonly media: MediaQueryList | undefined
   private readonly browserStorage: Storage | undefined
   /** Override layers by source; seq (monotonic) is the stacking order. */
@@ -247,11 +255,26 @@ export class ThemeRuntime {
    * @param tokens - complete allowlisted semantic color palette.
    */
   setCustomTokens(tokens: Readonly<Record<string, string>>): void {
-    const normalized = normalizeCustomThemeTokens(tokens)
-    validateCustomThemeContrast(normalized)
-    const serialized = JSON.stringify(normalized)
-    this.customTokens = normalized
-    void this.host.set(THEME_CUSTOM_TOKENS_FIELD, serialized)
+    this.setCustomTheme(tokens, this.backgroundImage, this.backgroundOpacity)
+  }
+
+  /**
+   * Validate and persist all editable custom-theme content as one envelope.
+   * @param tokens - complete editable color palette.
+   * @param image - empty string or canonical PNG/JPEG/WebP data URL.
+   * @param opacity - integer percentage from 0 through 100.
+   */
+  setCustomTheme(tokens: Readonly<Record<string, string>>, image: string, opacity: number): void {
+    const normalizedTokens = normalizeCustomThemeTokens(tokens)
+    validateCustomThemeContrast(normalizedTokens)
+    const normalizedImage = normalizeBackgroundImage(image)
+    const normalizedOpacity = normalizeBackgroundOpacity(opacity)
+    this.customTokens = normalizedTokens
+    this.backgroundImage = normalizedImage
+    this.backgroundOpacity = normalizedOpacity
+    void this.host.set(THEME_CUSTOM_THEME_FIELD, JSON.stringify({
+      tokens: normalizedTokens, backgroundImage: normalizedImage, backgroundOpacity: normalizedOpacity,
+    }))
     if (this.preference !== 'custom') {
       this.preference = 'custom'
       void this.host.set(THEME_PREFERENCE_FIELD, 'custom')
@@ -264,13 +287,20 @@ export class ThemeRuntime {
     try {
       const raw = storage.getItem(THEME_SETTINGS_NAMESPACE)
       if (raw === null) return
-      const value = JSON.parse(raw) as { preference?: unknown; customTokens?: unknown }
+      const value = JSON.parse(raw) as {
+        preference?: unknown
+        customTokens?: unknown
+        backgroundImage?: unknown
+        backgroundOpacity?: unknown
+      }
       if (isThemePreference(value.preference)) this.preference = value.preference
       if (typeof value.customTokens === 'object' && value.customTokens !== null) {
         const normalized = normalizeCustomThemeTokens(value.customTokens as Record<string, string>)
         validateCustomThemeContrast(normalized)
         this.customTokens = normalized
       }
+      if (typeof value.backgroundImage === 'string') this.backgroundImage = normalizeBackgroundImage(value.backgroundImage)
+      if (typeof value.backgroundOpacity === 'number') this.backgroundOpacity = normalizeBackgroundOpacity(value.backgroundOpacity)
     } catch { /* Corrupt browser data falls back to safe defaults. */ }
   }
 
@@ -279,13 +309,15 @@ export class ThemeRuntime {
       this.browserStorage?.setItem(THEME_SETTINGS_NAMESPACE, JSON.stringify({
         preference: this.preference,
         customTokens: this.customTokens,
+        backgroundImage: this.backgroundImage,
+        backgroundOpacity: this.backgroundOpacity,
       }))
     } catch { /* Storage may be disabled or full; live theming still works. */ }
   }
 
-  /** Restore the shipped custom palette and activate it. */
+  /** Restore the shipped custom palette, remove its background, and activate it. */
   resetCustomTokens(): void {
-    this.setCustomTokens(DEFAULT_CUSTOM_THEME.tokens)
+    this.setCustomTheme(DEFAULT_CUSTOM_THEME.tokens, '', 25)
   }
 
   /** Adopt the scope's accepted durable preference without writing it back. */
@@ -295,16 +327,30 @@ export class ThemeRuntime {
     let changed = this.preference !== section.preference
     this.preference = section.preference
     try {
-      const parsed = JSON.parse(section.customTokens) as unknown
-      if (typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0) {
-        const normalized = normalizeCustomThemeTokens(parsed as Record<string, string>)
-        validateCustomThemeContrast(normalized)
-        if (JSON.stringify(normalized) !== JSON.stringify(this.customTokens)) {
-          this.customTokens = normalized
-          changed = true
-        }
+      const envelope = section.customTheme === '' ? undefined : JSON.parse(section.customTheme) as {
+        tokens?: unknown
+        backgroundImage?: unknown
+        backgroundOpacity?: unknown
       }
-    } catch { /* Invalid durable drafts keep the safe default palette. */ }
+      if (envelope !== undefined && (typeof envelope.backgroundImage !== 'string'
+        || typeof envelope.backgroundOpacity !== 'number' || typeof envelope.tokens !== 'object'
+        || envelope.tokens === null)) throw new TypeError('invalid custom theme envelope')
+      const parsed = envelope?.tokens ?? JSON.parse(section.customTokens) as unknown
+      const normalized = typeof parsed === 'object' && parsed !== null && Object.keys(parsed).length > 0
+        ? normalizeCustomThemeTokens(parsed as Record<string, string>) : this.customTokens
+      validateCustomThemeContrast(normalized)
+      const image = normalizeBackgroundImage(envelope === undefined
+        ? section.backgroundImage : envelope.backgroundImage as string)
+      const opacity = normalizeBackgroundOpacity(envelope === undefined
+        ? section.backgroundOpacity : envelope.backgroundOpacity as number)
+      if (JSON.stringify(normalized) !== JSON.stringify(this.customTokens)
+        || image !== this.backgroundImage || opacity !== this.backgroundOpacity) {
+        this.customTokens = normalized
+        this.backgroundImage = image
+        this.backgroundOpacity = opacity
+        changed = true
+      }
+    } catch { /* Invalid durable custom content is rejected as one unit. */ }
     if (changed) this.publish()
   }
 
@@ -366,7 +412,15 @@ export class ThemeRuntime {
       : this.preference
     // Both built-ins always exist; a registered preference id resolves or has
     // been reset by its disposer, so the lookup cannot miss.
-    const custom: ThemeDefinition = Object.freeze({ id: 'custom', colorScheme: 'light', tokens: Object.freeze({ ...this.customTokens }) })
+    const backgroundTokens = this.backgroundImage === '' ? {} : {
+      '--dsh-theme-background-image': `url("${this.backgroundImage}")`,
+      '--dsh-theme-background-opacity': String(this.backgroundOpacity / 100),
+    }
+    const custom: ThemeDefinition = Object.freeze({
+      id: 'custom',
+      colorScheme: 'light',
+      tokens: Object.freeze({ ...this.customTokens, ...backgroundTokens }),
+    })
     const themes = [...this.themes, custom]
     const active = themes.find(t => t.id === resolvedId)
     /* v8 ignore next 2 -- needs a registry without light/dark, which register()/dispose() cannot produce */
@@ -377,6 +431,8 @@ export class ThemeRuntime {
       themes: Object.freeze(themes),
       revision: this.revision,
       customTokens: Object.freeze({ ...this.customTokens }),
+      backgroundImage: this.backgroundImage,
+      backgroundOpacity: this.backgroundOpacity,
     })
   }
 
@@ -467,7 +523,13 @@ export function apply(ctx: ClientContext): void {
   const store = createAppearanceRowStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, JSON.stringify(snapshot.customTokens), snapshot.revision)
+    bound?.sync(
+      snapshot.preference,
+      JSON.stringify(snapshot.customTokens),
+      snapshot.backgroundImage,
+      snapshot.backgroundOpacity,
+      snapshot.revision,
+    )
   }
   ctx.on('theme/change', sync)
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
@@ -477,7 +539,7 @@ export function apply(ctx: ClientContext): void {
     sync(theme.getTheme())
     return {
       setTheme: (id) => { theme.setTheme(id) },
-      saveCustomTokens: (tokens) => { theme.setCustomTokens(tokens) },
+      saveCustomTheme: (tokens, image, opacity) => { theme.setCustomTheme(tokens, image, opacity) },
       resetCustomTokens: () => { theme.resetCustomTokens() },
     }
   }

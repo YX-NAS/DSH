@@ -21,9 +21,13 @@ describe('ui-theme host', () => {
     const fiber = ctx.plugin({ apply })
     await fiber.await()
     const ns = settingsNamespace(THEME_SETTINGS_NAMESPACE)
-    expect(ctx.settings.get(ns)).toEqual({ preference: DEFAULT_PREFERENCE, customTokens: '{}' })
+    expect(ctx.settings.get(ns)).toEqual({
+      preference: DEFAULT_PREFERENCE, customTokens: '{}', customTheme: '', backgroundImage: '', backgroundOpacity: 25,
+    })
     await ctx.settings.update(ns, { preference: 'dark' })
-    expect(ctx.settings.get(ns)).toEqual({ preference: 'dark', customTokens: '{}' })
+    expect(ctx.settings.get(ns)).toEqual({
+      preference: 'dark', customTokens: '{}', customTheme: '', backgroundImage: '', backgroundOpacity: 25,
+    })
     await expect(ctx.settings.update(ns, { preference: 'sepia' })).rejects.toThrow()
     await fiber.dispose()
     expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)
